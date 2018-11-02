@@ -14,8 +14,7 @@ public final class AutowiringSpringBeanJobFactory extends SpringBeanJobFactory i
     private transient AutowireCapableBeanFactory beanFactory;
 
     @Override
-    protected Object createJobInstance(final TriggerFiredBundle bundle)
-            throws Exception {
+    protected Object createJobInstance(final TriggerFiredBundle bundle) throws Exception {
         final Object job = super.createJobInstance(bundle);
         beanFactory.autowireBean(job);
         return job;

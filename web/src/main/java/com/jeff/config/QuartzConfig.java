@@ -4,6 +4,7 @@ import org.quartz.*;
 import org.quartz.impl.StdSchedulerFactory;
 import org.quartz.spi.JobFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.config.PropertiesFactoryBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationContext;
@@ -29,24 +30,7 @@ public class QuartzConfig {
         return jobFactory;
     }
 
-    //Inject Multiple triggers/jobs (Spring setting)
-    @Bean
-    public SchedulerFactoryBean scheduler(List<Trigger> triggers, JobFactory jobFactory, Properties quartzProperties) {
-        SchedulerFactoryBean factory = new SchedulerFactoryBean();
-        factory.setOverwriteExistingJobs(true);
-        factory.setAutoStartup(true);
-        factory.setJobFactory(jobFactory);
-        factory.setQuartzProperties(quartzProperties);
-
-        // Here we will set all the trigger beans we have defined.
-        if (!triggers.isEmpty()) {
-            factory.setTriggers(triggers.toArray(new Trigger[triggers.size()]));
-        }
-
-        return factory;
-    }
-
-    @Bean
+    @Bean(name="quartzProperties")
     public Properties quartzProperties() throws IOException {
         PropertiesFactoryBean propertiesFactoryBean = new PropertiesFactoryBean();
         propertiesFactoryBean.setLocation(new ClassPathResource("quartz/quartz.properties"));
@@ -54,6 +38,44 @@ public class QuartzConfig {
         return propertiesFactoryBean.getObject();
     }
 
+    //TODO
+    //Inject Multiple triggers/jobs (Spring setting)
+//    @Bean
+//    public SchedulerFactoryBean schedulerFactoryBean(JobFactory jobFactory, List<Trigger> listOfTrigger, @Qualifier("quartzProperties") Properties quartzProperties) throws IOException {
+//        SchedulerFactoryBean factory = new SchedulerFactoryBean();
+//        factory.setOverwriteExistingJobs(true);
+//        factory.setAutoStartup(true);
+//        factory.setJobFactory(jobFactory);
+//        factory.setQuartzProperties(quartzProperties);
+//
+//        if (!listOfTrigger.isEmpty()) {
+//            factory.setTriggers(listOfTrigger.toArray(new Trigger[listOfTrigger.size()]));
+//        }
+//
+//        return factory;
+//    }
+
+    //Inject Multiple triggers/jobs (Quartz setting)
+    @Bean
+    public Scheduler scheduler(Map<String, JobDetail> jobMap, List<Trigger> triggers) throws SchedulerException, IOException {
+        StdSchedulerFactory factory = new StdSchedulerFactory();
+        factory.initialize(new ClassPathResource("quartz/quartz.properties").getInputStream());
+        Scheduler scheduler = factory.getScheduler();
+        scheduler.setJobFactory(springBeanJobFactory());
+        Map<JobDetail,Set<? extends Trigger>> triggersAndJobs = new HashMap<>();
+        for(JobDetail jobDetail : jobMap.values()){
+            for(Trigger trigger : triggers){
+                if(trigger.getJobKey().equals(jobDetail.getKey())){
+                    Set<Trigger> set = new HashSet<>();
+                    set.add(trigger);
+                    triggersAndJobs.put(jobDetail,set);
+                }
+            }
+        }
+        scheduler.scheduleJobs(triggersAndJobs, false);
+        scheduler.start();
+        return scheduler;
+    }
 
     //Inject Single job
 //    @Bean
@@ -65,47 +87,6 @@ public class QuartzConfig {
 //        schedulerFactory.setTriggers(trigger);
 //        return schedulerFactory;
 //    }
-
-    //Inject Multiple triggers/jobs (Quartz setting)
-//    @Bean
-//    public Scheduler scheduler(Map<String, JobDetail> jobMap, List<Trigger> triggers) throws SchedulerException, IOException {
-//        StdSchedulerFactory factory = new StdSchedulerFactory();
-//        factory.initialize(new ClassPathResource("quartz/quartz.properties").getInputStream());
-//        Scheduler scheduler = factory.getScheduler();
-//        scheduler.setJobFactory(springBeanJobFactory());
-//        Map<JobDetail,Set<? extends Trigger>> triggersAndJobs = new HashMap<>();
-//        for(JobDetail jobDetail : jobMap.values()){
-//            for(Trigger trigger : triggers){
-//                if(trigger.getJobKey().equals(jobDetail.getKey())){
-//                    Set<Trigger> set = new HashSet<>();
-//                    set.add(trigger);
-//                    triggersAndJobs.put(jobDetail,set);
-//                }
-//            }
-//        }
-//        scheduler.scheduleJobs(triggersAndJobs, false);
-//        scheduler.start();
-//        return scheduler;
-//    }
-
-//    @Bean
-//    public JobDetail jobDetail() {
-//        return JobBuilder.newJob().ofType(SampleJob.class)
-//                .storeDurably()
-//                .withIdentity("Qrtz_Job_Detail")
-//                .withDescription("Invoke Sample Job service...")
-//                .build();
-//    }
-
-//    @Bean
-//    public Trigger trigger(JobDetail job) {
-//        return TriggerBuilder.newTrigger().forJob(job)
-//                .withIdentity("Qrtz_Trigger")
-//                .withDescription("Sample trigger")
-//                .withSchedule(simpleSchedule().repeatForever().withIntervalInSeconds(10))
-//                .build();
-//    }
-
 
     public static SimpleTriggerFactoryBean createTrigger(JobDetail jobDetail, long pollFrequencyMs) {
         SimpleTriggerFactoryBean factoryBean = new SimpleTriggerFactoryBean();
