@@ -114,6 +114,7 @@ public class DateTimeTest {
 
         //Duration example
         Duration thirtyDay = Duration.ofDays(30);
+        System.out.println(thirtyDay.toHours());
         System.out.println(thirtyDay);
     }
 
